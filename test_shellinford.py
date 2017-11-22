@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-from nose.tools import assert_equal, assert_true
+from nose.tools import assert_equal, assert_true, nottest
 import shellinford
+from shellinford.shellinford import SEARCH_RESULT
 import tempfile
 import os
 from sys import version_info
@@ -9,82 +10,108 @@ from sys import version_info
 class Test_FMIndex(object):
 
     def test_build(self):
-        self.fm = shellinford.FMIndex()
+        fm = shellinford.FMIndex()
 
         docs_list = ('a', 'b', 'c')
-        self.fm.build(docs_list)
-        assert_equal(self.fm.docsize(), 3)
+        fm.build(docs_list)
+        assert_equal(fm.docsize, 3)
 
         docs_dict = {'a': '1', 'b': '0', 'c': '2'}
-        self.fm.build(docs_dict)
-        assert_equal(self.fm.docsize(), 6)
+        fm.build(docs_dict)
+        assert_equal(fm.docsize, 6)
 
-        if version_info >= (3,0,0):
+        if version_info >= (3, 0, 0):
             docs_generator = (str(i) for i in range(3))
         else:
             docs_generator = (str(i) for i in xrange(3))
-        self.fm.build(docs_generator)
-        assert_equal(self.fm.docsize(), 9)
+        fm.build(docs_generator)
+        assert_equal(fm.docsize, 9)
 
     def test_search(self):
-        self.fm = shellinford.FMIndex()
+        fm = shellinford.FMIndex()
         docs_list = ('ab', 'bc', 'cd')
-        self.fm.build(docs_list)
+        fm.build(docs_list)
 
-        found_doc = next(self.fm.search('a'))
-        expected_result = shellinford.SEARCH_RESULT_FMINDEX(0, 1, 'ab')
-        assert_equal(found_doc, expected_result)
-
-        found_doc = next(self.fm.search(['a', 'b']))
-        expected_result = shellinford.SEARCH_RESULT_FMINDEX(0, 1, 'ab')
-        assert_equal(found_doc, expected_result)
-
+        params = [dict(query='a'),
+                  dict(query=['a', 'b'], _or=False),
+                  dict(query='a', _or=False, ignores=['c']),
+                  dict(query=['a', 'd'], _or=True),
+                  dict(query=['a', 'd'], _or=True, ignores=['c'])]
+        desireds = [[SEARCH_RESULT(0, [1], 'ab')],
+                    [SEARCH_RESULT(0, [1, 1], 'ab')],
+                    [SEARCH_RESULT(0, [1], 'ab')],
+                    [SEARCH_RESULT(0, [1, 0], 'ab'),
+                     SEARCH_RESULT(2, [0, 1], 'cd')],
+                    [SEARCH_RESULT(0, [1, 0], 'ab')]]
+        for (param, desired) in zip(params, desireds):
+            actual = fm.search(**param)
+            assert_equal(list(actual), desired)
 
     def test_push_back(self):
-        self.fm = shellinford.FMIndex()
-        self.fm.push_back('a')
-        self.fm.build()
-        assert_equal(self.fm.docsize(), 1)
+        fm = shellinford.FMIndex()
+        fm.push_back('a')
+        fm.build()
+        assert_equal(fm.docsize, 1)
 
     def test_size(self):
-        self.fm = shellinford.FMIndex()
-        assert_equal(self.fm.size(), 0)
-        self.fm.build(['a', 'b'])
-        assert_equal(self.fm.size(), 3)
+        fm = shellinford.FMIndex()
+        assert_equal(fm.size, 0)
+        fm.build(['a', 'b'])
+        assert_equal(fm.size, 3)
+        assert_equal(len(fm), 3)
 
     def test_docsize(self):
-        self.fm = shellinford.FMIndex()
-        assert_equal(self.fm.docsize(), 0)
-        self.fm.build(['a', 'b'])
-        assert_equal(self.fm.docsize(), 2)
+        fm = shellinford.FMIndex()
+        assert_equal(fm.docsize, 0)
+        fm.build(['a', 'b'])
+        assert_equal(fm.docsize, 2)
 
     def test_clear(self):
-        self.fm = shellinford.FMIndex()
-        self.fm.build(['a', 'b'])
-        self.fm.clear()
-        assert_equal(self.fm.size(), 0)
-        assert_equal(self.fm.docsize(), 0)
+        fm = shellinford.FMIndex()
+        fm.build(['a', 'b'])
+        fm.clear()
+        assert_equal(fm.size, 0)
+        assert_equal(fm.docsize, 0)
 
     def test_write(self):
-        self.fm = shellinford.FMIndex()
-        filename = tempfile.mkstemp()[1]
-        self.fm.build(['a', 'b'])
-        self.fm.write(filename)
-        assert_true(len(open(filename, 'r').read()) > 0)
-        os.remove(filename)
+        fm = shellinford.FMIndex()
+        try:
+            filename = tempfile.mkstemp()[1]
+            fm.build(['a', 'b'])
+            fm.write(filename)
+            assert_true(len(open(filename, 'r').read()) > 0)
+        finally:
+            os.remove(filename)
 
     def test_read(self):
-        self.fm = shellinford.FMIndex()
-        filename = tempfile.mkstemp()[1]
-        self.fm.build(['a', 'b'], filename)
-        self.fm.clear()
+        fm = shellinford.FMIndex()
+        try:
+            filename = tempfile.mkstemp()[1]
+            fm.build(['a', 'b'], filename)
+            fm.clear()
 
-        self.fm.read(filename)
-        assert_equal(self.fm.docsize(), 2)
-        found_doc = next(self.fm.search('a'))
-        expected_result = shellinford.SEARCH_RESULT_FMINDEX(0, 1, 'a')
-        assert_equal(found_doc, expected_result)
-        os.remove(filename)
+            fm.read(filename)
+            assert_equal(fm.docsize, 2)
+            found_doc = fm.search('a')
+            expected_result = SEARCH_RESULT(0, [1], 'a')
+            assert_equal(found_doc[0], expected_result)
+        finally:
+            os.remove(filename)
+
+    def test___init__(self):
+        fm = shellinford.FMIndex()
+        try:
+            filename = tempfile.mkstemp()[1]
+            fm.build(['a', 'b'])
+            fm.write(filename)
+            del fm
+            fm = shellinford.FMIndex(filename=filename)
+            assert_equal(fm.docsize, 2)
+            found_doc = fm.search('a')
+            expected_result = SEARCH_RESULT(0, [1], 'a')
+            assert_equal(found_doc[0], expected_result)
+        finally:
+            os.remove(filename)
 
 
 class test_bit_vector(object):
@@ -150,3 +177,30 @@ class test_bit_vector(object):
         self.bv.read(filename)
         assert_true(self.bv.get(100))
         os.remove(filename)
+
+
+class test_bwt(object):
+
+    def test_clear(self):
+        bwt = shellinford.bwt()
+        bwt.build('iroha')
+        bwt.clear()
+        assert_equal(bwt.size, 0)
+
+    def test_build(self):
+        bwt = shellinford.bwt()
+        assert_equal(bwt.size, 0)
+        bwt.build('iroha')
+        assert_equal(bwt.size, 5)
+
+    def test_size(self):
+        bwt = shellinford.bwt()
+        assert_equal(bwt.size, 0)
+
+    def test_head(self):
+        bwt = shellinford.bwt()
+        assert_equal(bwt.head, 0)
+
+    @nottest
+    def test_get(self):
+        pass

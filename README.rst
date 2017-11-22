@@ -5,6 +5,9 @@ shellinford
     :target: http://badge.fury.io/py/shellinford
 .. image:: https://travis-ci.org/ikegami-yukino/shellinford-python.svg?branch=master
     :target: https://travis-ci.org/ikegami-yukino/shellinford-python
+.. image:: https://coveralls.io/repos/ikegami-yukino/shellinford-python/badge.png
+    :target: https://coveralls.io/r/ikegami-yukino/shellinford-python
+
 
 Shellinford is an implementation of a Wavelet Matrix/Tree succinct data structure for document retrieval.
 
@@ -24,7 +27,7 @@ Usage
 =====
 
 Create a new FM-index instance
------------------------------
+-------------------------------
 
 ::
 
@@ -73,9 +76,10 @@ Search word from FM-index
  count: 1
  text:  Milky Holmes
 
-- search(query)
+- search(query, [_or=False, ignores=[]])
 
-  - Giving Sequence data (list, tuple, etc.) enables to "AND" search
+  - If `_or` = True, then "OR" search is executed, else "AND" search
+  - Given `ignores`, "NOT" search is also executed
   - NOTE: The search function is available after FM-index is built or loaded
 
 
